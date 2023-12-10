@@ -225,6 +225,11 @@
 	margin-left: 7px;
 	animation-delay: 0.3s;
 }
+
+.typing-indicator{
+	color: var(--hover);
+	text-transform: lowercase;
+}
 /*-------------------- Message Box --------------------*/
 .message-box {
 	flex: 0 1 40px;
@@ -336,7 +341,7 @@
     <div class="chat">
         <div class="chat-title">
             <h1>Lolo</h1>
-            <h2>Mouhamed Sarr</h2>
+            <h2>Mouhamed Sarr <span class="typing-indicator"></span></h2>
             <figure class="avatar">
             <img src="images/prifimg.png" /></figure>
             <button class="close">X</button>
@@ -352,12 +357,14 @@
 
     <div class="bg"></div>
 	<script>
-		// Sélection des éléments DOM
+// Sélection des éléments DOM
 const messagesContent = document.querySelector(".messages-content");
 const messageInput = document.querySelector(".message-input");
 const messageSubmit = document.querySelector(".message-submit");
+const typingIndicator = document.querySelector(".typing-indicator");
 
 let socket = null;
+let isTyping = false; // Nouvelle variable pour suivre l'état "is typing"
 
 // Fonction pour la mise à jour de la barre de défilement
 function updateScrollbar() {
@@ -372,6 +379,30 @@ function setDate() {
     timestamp.textContent = d.getHours() + ":" + d.getMinutes();
     const lastMessage = document.querySelector(".message:last-child");
     lastMessage.appendChild(timestamp);
+}
+
+// Fonction pour afficher "is typing"
+function showTypingIndicator() {
+    if (!isTyping) {
+        isTyping = true;
+        typingIndicator.textContent = "is typing...";
+        // Envoyer l'état "is typing" via WebSocket
+        if (socket) {
+            socket.send(JSON.stringify({ isTyping: true }));
+        }
+    }
+}
+
+// Fonction pour masquer l'indicateur "is typing"
+function hideTypingIndicator() {
+    if (isTyping) {
+        isTyping = false;
+        typingIndicator.textContent = "";
+        // Envoyer l'état "not typing" via WebSocket
+        if (socket) {
+            socket.send(JSON.stringify({ isTyping: false }));
+        }
+    }
 }
 
 // Fonction pour insérer un message
@@ -393,6 +424,7 @@ function insertMessage() {
 
     setDate();
     messageInput.value = "";
+    hideTypingIndicator(); // Masquer l'indicateur après l'envoi du message
     updateScrollbar();
 }
 
@@ -402,6 +434,9 @@ if (document.querySelector(".chat") !== null) {
 }
 
 // Événement de touche enfoncée
+messageInput.addEventListener("input", showTypingIndicator);
+messageInput.addEventListener("blur", hideTypingIndicator);
+
 window.addEventListener("keydown", function (e) {
     if (e.which === 13) {
         insertMessage();
@@ -418,14 +453,28 @@ if (!window.WebSocket) {
         alert("Connection has been closed.");
     };
     socket.onmessage = function (e) {
-        const newMessage = document.createElement("div");
-        newMessage.classList.add("message", "new");
-        newMessage.textContent = e.data;
-        messagesContent.appendChild(newMessage);
-        setDate();
-        updateScrollbar();
+        const data = JSON.parse(e.data);
+
+        if (data.isTyping !== undefined) {
+            // Mettre à jour l'indicateur "is typing" en fonction des données reçues
+            if (data.isTyping) {
+                typingIndicator.textContent = "is typing...";
+            } else {
+                typingIndicator.textContent = "";
+            }
+        } else {
+            // Afficher le message reçu
+            const newMessage = document.createElement("div");
+            newMessage.classList.add("message", "new");
+            newMessage.textContent = data.message;
+            messagesContent.appendChild(newMessage);
+            setDate();
+            hideTypingIndicator(); // Masquer l'indicateur après la réception du message
+            updateScrollbar();
+        }
     };
 }
+
 	</script>
     
 </body>
